@@ -114,16 +114,16 @@ export default function AIBodyAnalyzer() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
-      <div className="flex justify-end p-4">
+      {/* <div className="flex justify-end p-4">
         <div className="flex items-center gap-2">
           <span>Deploy</span>
           <MoreHorizontal className="w-4 h-4" />
         </div>
-      </div>
+      </div> */}
 
       <div className="flex">
         {/* Sidebar */}
-        <div className="w-64 p-6 bg-gray-800">
+        <div className="w-64 p-6 bg-gray-800 h-full min-h-screen">
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-6">Personal Information</h2>
 
@@ -226,7 +226,7 @@ export default function AIBodyAnalyzer() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 pt-[80px] pl-[60px] pr-6 pb-6">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
