@@ -1,13 +1,22 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Ruler, Upload, BarChart3, Download, X, CheckCircle, MoreHorizontal } from "lucide-react"
+import { Ruler, Upload, BarChart3, Download, X, CheckCircle } from "lucide-react"
+
+type BodyMeasurements = {
+  gender: string;
+  shoulder: number;
+  waist: number;
+  chest: number;
+  inseam_left: number;
+  inseam_right: number;
+  hips: number;
+  bmi: number;
+};
 
 export default function AIBodyAnalyzer() {
   const [height, setHeight] = useState("170.00")
@@ -18,10 +27,12 @@ export default function AIBodyAnalyzer() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [measurements, setMeasurements] = useState<BodyMeasurements | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   const validateFile = (file: File): string | null => {
-    const maxSize = 200 * 1024 * 1024 // 200MB for videos
-    const allowedTypes = [
+    const maxSize = 200 * 1024 * 1024 // 200MB
+    const allowedVideoTypes = [
       "video/mp4",
       "video/avi",
       "video/mov",
@@ -30,13 +41,19 @@ export default function AIBodyAnalyzer() {
       "video/x-matroska",
       "video/mpeg",
     ]
+    const allowedImageTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ]
+    const allowedTypes = [...allowedVideoTypes, ...allowedImageTypes]
 
     if (file.size > maxSize) {
       return "File size must be less than 200MB"
     }
 
     if (!allowedTypes.includes(file.type)) {
-      return "Please upload a valid video file (MP4, AVI, MOV, MKV, MPEG4)"
+      return "Please upload a valid video (MP4, AVI, MOV, MKV) or image (JPG, PNG, WEBP) file"
     }
 
     return null
@@ -51,6 +68,8 @@ export default function AIBodyAnalyzer() {
 
     setIsUploading(true)
     setUploadProgress(0)
+    setIsAnalyzed(false)
+    setMeasurements(null)
 
     // Simulate upload progress
     const interval = setInterval(() => {
@@ -97,6 +116,7 @@ export default function AIBodyAnalyzer() {
     setUploadedFile(null)
     setIsAnalyzed(false)
     setUploadProgress(0)
+    setMeasurements(null)
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -104,23 +124,50 @@ export default function AIBodyAnalyzer() {
     const k = 1024
     const sizes = ["Bytes", "KB", "MB", "GB"]
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const handleAnalyze = () => {
-    setIsAnalyzed(true)
+  const handleAnalyze = async () => {
+    if (!uploadedFile) return
+
+    setIsAnalyzing(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', uploadedFile)
+      formData.append('height', height)
+      formData.append('weight', weight)
+      formData.append('gender', gender)
+
+      const response = await fetch('https://60ab-35-247-143-177.ngrok-free.app/predict', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Analysis failed. Please try again.')
+      }
+
+      const data: BodyMeasurements = await response.json()
+      setMeasurements(data)
+      setIsAnalyzed(true)
+    } catch (error) {
+      console.error('Error analyzing:', error)
+      alert(error instanceof Error ? error.message : 'Analysis failed. Please try again.')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const getBMICategory = (bmi: number): string => {
+    if (bmi < 18.5) return "Underweight"
+    if (bmi < 25) return "Normal weight"
+    if (bmi < 30) return "Overweight"
+    return "Obese"
   }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Header */}
-      {/* <div className="flex justify-end p-4">
-        <div className="flex items-center gap-2">
-          <span>Deploy</span>
-          <MoreHorizontal className="w-4 h-4" />
-        </div>
-      </div> */}
-
       <div className="flex">
         {/* Sidebar */}
         <div className="w-64 p-6 bg-gray-800 h-full min-h-screen">
@@ -144,7 +191,7 @@ export default function AIBodyAnalyzer() {
                       variant="ghost"
                       size="sm"
                       className="text-white hover:bg-gray-600 px-3"
-                      onClick={() => setHeight((prev) => (Number.parseFloat(prev) - 1).toFixed(2))}
+                      onClick={() => setHeight((prev) => (parseFloat(prev) - 1).toFixed(2))}
                     >
                       −
                     </Button>
@@ -152,7 +199,7 @@ export default function AIBodyAnalyzer() {
                       variant="ghost"
                       size="sm"
                       className="text-white hover:bg-gray-600 px-3"
-                      onClick={() => setHeight((prev) => (Number.parseFloat(prev) + 1).toFixed(2))}
+                      onClick={() => setHeight((prev) => (parseFloat(prev) + 1).toFixed(2))}
                     >
                       +
                     </Button>
@@ -176,7 +223,7 @@ export default function AIBodyAnalyzer() {
                       variant="ghost"
                       size="sm"
                       className="text-white hover:bg-gray-600 px-3"
-                      onClick={() => setWeight((prev) => (Number.parseFloat(prev) - 1).toFixed(2))}
+                      onClick={() => setWeight((prev) => (parseFloat(prev) - 1).toFixed(2))}
                     >
                       −
                     </Button>
@@ -184,7 +231,7 @@ export default function AIBodyAnalyzer() {
                       variant="ghost"
                       size="sm"
                       className="text-white hover:bg-gray-600 px-3"
-                      onClick={() => setWeight((prev) => (Number.parseFloat(prev) + 1).toFixed(2))}
+                      onClick={() => setWeight((prev) => (parseFloat(prev) + 1).toFixed(2))}
                     >
                       +
                     </Button>
@@ -234,7 +281,7 @@ export default function AIBodyAnalyzer() {
               <h1 className="text-3xl font-bold">AI Body Measurement Analyzer</h1>
             </div>
             <p className="text-gray-300">
-              Upload a video of yourself and get accurate body measurements using AI pose detection!
+              Upload a video or image of yourself and get accurate body measurements using AI pose detection!
             </p>
           </div>
 
@@ -245,11 +292,11 @@ export default function AIBodyAnalyzer() {
                 <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
                   <span className="text-sm">📹</span>
                 </div>
-                <h2 className="text-2xl font-semibold">Upload Video</h2>
+                <h2 className="text-2xl font-semibold">Upload Media</h2>
               </div>
 
               <div className="space-y-4">
-                <p className="text-gray-300">Choose a video file</p>
+                <p className="text-gray-300">Choose a video or image file</p>
 
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
@@ -261,11 +308,11 @@ export default function AIBodyAnalyzer() {
                 >
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-300 mb-2">Drag and drop file here</p>
-                  <p className="text-gray-500 text-sm mb-4">limit 200mb per file-MP4, AVI, MOV, MKV, MPEG4</p>
+                  <p className="text-gray-500 text-sm mb-4">Limit 200MB per file - MP4, AVI, MOV, MKV, JPG, PNG, WEBP</p>
                   <div>
                     <input
                       type="file"
-                      accept="video/mp4,video/avi,video/mov,video/quicktime,video/x-msvideo,video/x-matroska,video/mpeg"
+                      accept="video/*,image/*"
                       onChange={handleFileUpload}
                       className="hidden"
                       id="file-upload"
@@ -297,7 +344,9 @@ export default function AIBodyAnalyzer() {
                   <div className="flex items-center justify-between bg-gray-800 p-3 rounded">
                     <div className="flex items-center gap-3">
                       <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
-                        <span className="text-xs">📹</span>
+                        <span className="text-xs">
+                          {uploadedFile.type.startsWith('video/') ? '📹' : '🖼️'}
+                        </span>
                       </div>
                       <div>
                         <p className="text-sm font-medium">{uploadedFile.name}</p>
@@ -318,7 +367,9 @@ export default function AIBodyAnalyzer() {
                 {uploadedFile && !isUploading && (
                   <div className="flex items-center gap-2 bg-green-900/30 text-green-400 p-3 rounded">
                     <CheckCircle className="w-4 h-4" />
-                    <span className="text-sm">Video uploaded successfully</span>
+                    <span className="text-sm">
+                      {uploadedFile.type.startsWith('video/') ? 'Video' : 'Image'} uploaded successfully
+                    </span>
                   </div>
                 )}
               </div>
@@ -336,7 +387,7 @@ export default function AIBodyAnalyzer() {
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">👆</span>
                     <span className="text-blue-300">
-                      Upload a video and click 'Analyze' to see your body measurements here!
+                      Upload a file and click 'Analyze' to see your body measurements here!
                     </span>
                   </div>
                 </div>
@@ -350,51 +401,57 @@ export default function AIBodyAnalyzer() {
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Height</p>
-                      <p className="text-2xl font-bold">175.0 cm</p>
+                      <p className="text-2xl font-bold">{height} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Chest</p>
-                      <p className="text-2xl font-bold">75.0 cm</p>
+                      <p className="text-2xl font-bold">{measurements?.chest.toFixed(1) || '--'} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Shoulders</p>
-                      <p className="text-2xl font-bold">40.2 cm</p>
+                      <p className="text-2xl font-bold">{measurements?.shoulder.toFixed(1) || '--'} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Weight</p>
-                      <p className="text-2xl font-bold">72.0 kg</p>
+                      <p className="text-2xl font-bold">{weight} kg</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Waist</p>
-                      <p className="text-2xl font-bold">34.0 cm</p>
+                      <p className="text-2xl font-bold">{measurements?.waist.toFixed(1) || '--'} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Inseam</p>
-                      <p className="text-2xl font-bold">40.2 cm</p>
+                      <p className="text-2xl font-bold">{measurements?.inseam_left.toFixed(1) || '--'} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">BMI</p>
-                      <p className="text-2xl font-bold">23.5</p>
+                      <p className="text-2xl font-bold">{measurements?.bmi.toFixed(1) || '--'}</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">Hip</p>
-                      <p className="text-2xl font-bold">34.0 cm</p>
+                      <p className="text-2xl font-bold">{measurements?.hips.toFixed(1) || '--'} cm</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">BMI Category</p>
-                      <p className="text-2xl font-bold">Normal weight</p>
+                      <p className="text-2xl font-bold">
+                        {measurements ? getBMICategory(measurements.bmi) : '--'}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="bg-gray-800 p-3 rounded">
-                    <p className="text-sm">
-                      <span className="font-medium">BMI status:</span>{" "}
-                      <span className="text-green-400">Normal weight (BMI: 25.5)</span>
-                    </p>
-                  </div>
+                  {measurements && (
+                    <div className="bg-gray-800 p-3 rounded">
+                      <p className="text-sm">
+                        <span className="font-medium">BMI status:</span>{" "}
+                        <span className="text-green-400">
+                          {getBMICategory(measurements.bmi)} (BMI: {measurements.bmi.toFixed(1)})
+                        </span>
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
-                    <h3 className="text-xl font-semibold">AI pose Detection</h3>
+                    <h3 className="text-xl font-semibold">AI Pose Detection</h3>
                     <p className="text-gray-300 text-sm">
                       Here are sample frames showing how the AI detected your body pose:
                     </p>
@@ -432,9 +489,10 @@ export default function AIBodyAnalyzer() {
             {uploadedFile && !isAnalyzed && !isUploading && (
               <Button
                 onClick={handleAnalyze}
+                disabled={isAnalyzing}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full"
               >
-                🔍 Analyze body measurements
+                {isAnalyzing ? 'Analyzing...' : '🔍 Analyze body measurements'}
               </Button>
             )}
 
